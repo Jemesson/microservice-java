@@ -8,6 +8,9 @@ import com.kipper.eventsmicroservice.exceptions.EventFullException;
 import com.kipper.eventsmicroservice.exceptions.EventNotFoundException;
 import com.kipper.eventsmicroservice.repositories.EventRepository;
 import com.kipper.eventsmicroservice.repositories.SubscriptionRepository;
+
+import jakarta.transaction.Transactional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -43,6 +46,8 @@ public class EventService {
         return event.getRegisteredParticipants() >= event.getMaxParticipants();
     }
 
+    // Rollback the transaction, once the EmailServiceClient throws an exception - participantEmail must be verified in SES identities.
+    @Transactional
     public void registerParticipant(String eventId, String participantEmail) {
         Event event = eventRepository.findById(eventId).orElseThrow(EventNotFoundException::new);
 
@@ -54,6 +59,9 @@ public class EventService {
         subscriptionRepository.save(subscription);
 
         event.setRegisteredParticipants(event.getRegisteredParticipants() + 1);
+
+        // update the new participant
+        eventRepository.save(event);
 
         EmailRequestDTO emailRequest = new EmailRequestDTO(participantEmail, "Confirmação de Inscrição", "Você foi inscrito no evento com sucesso!");
 
